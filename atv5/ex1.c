@@ -12,7 +12,6 @@ char *prepare_command(char command[ECHOMIN], char *args[], int argsize);
 char *get_result(char result[ECHOMAX]);
 
 int main(int argc, char *argv[]) {
-    int data_processed;
     int file_pipes[2];
     pid_t fork_result;
 
@@ -95,6 +94,6 @@ char *get_result(char result[ECHOMAX]) {
 
 	fclose(fp);
     strcpy(result, buffer);
-    
+
 	return result;
 }
