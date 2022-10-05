@@ -4,17 +4,26 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
+#include <semaphore.h>
+
+// states
+#define PRODUCING 1
+#define CONSUMING -1
+#define ON_HOLD 0
 
 // number of threads
 #define N 5
+
 // type
 #define A 'A'
 #define B 'B'
 #define C 'C'
+
 // price range
 #define GOLD 1
 #define SILVER 0
 #define BRONZE -1
+
 // quality
 #define HIGH 1
 #define MEDIUM 0
@@ -29,40 +38,70 @@ typedef struct product {
   useconds_t consume_time;
 } product_t;
 
+// struct for queue
 typedef struct node {
     product_t *product;
     struct node *next;
 } node_t;
 
-// mutex
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-// mutex conditions
-pthread_cond_t consume_type_A = PTHREAD_COND_INITIALIZER;
-pthread_cond_t consume_others = PTHREAD_COND_INITIALIZER;
+// iterator
+int i;
+
+// types array
+char types[N] = {A, B, C, A, B};
+
+// semaphores
+sem_t mutex;
+sem_t semaphores[N];
+int semaphores_to_wait[N][4] = {
+  {1, 2, 3, 4},
+  {0, 2, 3, 4},
+  {0, 1, 3, 4},
+  {0, 1, 2, 4},
+  {0, 1, 2, 3},
+};
+
+// state array
+int state[N];
+
 // product queue
 node_t *head = NULL;
 // product number
 int number_of_products = 0;
 
-void *producer(char type);
-void *consumer(char type);
+void *producer(int);
+void *consumer(int);
 useconds_t generate_random_time();
-// void *update_inventory(product_t *product_to_consume);
+void check_states(int i);
 void enqueue(node_t **head, product_t *node_value);
 product_t *dequeue(node_t **head);
+void check_status(int idx);
 
 int main() {
   pthread_t threads[N];
   int result;
   void *thread_result;
-  char types[3] = {'A', 'B', 'C'};
 
-  for (int i = 0; i < N; i++) {
-    printf("%d - %s\n", i, types[i]);
+  result = sem_init(&mutex, 0, 1);
+    if (result != 0) {
+      perror("init mutex");
+      exit(EXIT_FAILURE);
+    }
+
+  for (i = 0; i < N; i++) {
+    state[i] = ON_HOLD;
+    result = sem_init(&semaphores[i], 0, 0);
+    if (result != 0) {
+      perror("init sem");
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  for (i = 0; i < 3; i++) {
     if (i >= 3) {
-      result = pthread_create(&threads[i], NULL, &consumer, NULL);
+      result = pthread_create(&threads[i], NULL, &consumer, i);
     } else {
-      result = pthread_create(&threads[i], NULL, &producer, &types[i]);
+      result = pthread_create(&threads[i], NULL, &producer, i);
     }
 
     if (result != 0) {
@@ -71,19 +110,23 @@ int main() {
     }
   }
 
-  // for (int i = 0; i < N; i++) {
-  //   result = pthread_join(threads[i], &thread_result);
+  for (i = 0; i < 3; i++) {
+    result = pthread_join(threads[i], &thread_result);
 
-  //   if (result != 0) {
-  //     perror("Something happened during thread join");
-  //     exit(EXIT_FAILURE);
-  //   }
-  // }
+    if (result != 0) {
+      perror("Something happened during thread join");
+      exit(EXIT_FAILURE);
+    }
+  }
 
   return 0;
 }
 
-void *producer(char type) {
+void *producer(int i) {
+  // wait semaphore
+  printf("%d\n", i);
+  char type = types[i];
+  printf("INÍCIO PRODUTOR - TIPO %c\n", type);
   product_t *new_product;
   useconds_t times[2] = {0, 0};
 
@@ -107,32 +150,22 @@ void *producer(char type) {
     }
   }
 
-  pthread_mutex_lock(&mutex);
   usleep(new_product->produce_time);
   enqueue(&head, new_product);
   if (number_of_products == 1) {
-    if (type == A) {
-      pthread_cond_signal(&consume_type_A);
-    } else {
-      pthread_cond_signal(&consume_others);
-    }
+    //post semaphore
   }
-  pthread_mutex_unlock(&mutex);
-
-  return 0;
+  printf("FIM PRODUTOR - TIPO %c\n", type);
 }
 
-void *consumer(char type) {
-  pthread_mutex_lock(&mutex);
-  while(1) {
-    if (number_of_products == 0) {
-      if (type == A) {
-        pthread_cond_wait(&consume_type_A, &mutex);
-      } else {
-        pthread_cond_wait(&consume_others, &mutex);
-      }
-    }
+void *consumer(int i) {
+  printf("%d\n", i);
+  char type = types[i];
+  printf("INÍCIO CONSUMIDOR - TIPO %c\n", type);
 
+  //wait semaphores
+
+  while(1) {
     char current_product_type = head->product->type;
     if (current_product_type == type) {
       usleep(head->product->consume_time);
@@ -140,7 +173,9 @@ void *consumer(char type) {
       printf("%s - %d", dequeued_product->type, dequeued_product->price_range);
     }
   }
-  pthread_mutex_unlock(&mutex);
+
+  //post semaphore
+  printf("FIM CONSUMIDOR - TIPO %c\n", type);
 }
 
 useconds_t generate_random_time() {
@@ -183,4 +218,21 @@ product_t *dequeue(node_t **head) {
 
     number_of_products--;
     return retval;
+}
+
+void check_status(int idx) {
+  int wait_sems = semaphores_to_wait[idx];
+  bool ok = true;
+  for (i = 0; i < N; i++) {
+    if (i != idx && state[i] != ON_HOLD) {
+      ok = false;
+      break;
+    }
+  }
+
+  if (!ok) return;
+
+  if (idx < 3) state[idx] = PRODUCING;
+  if (idx > 2) state[idx] = CONSUMING;
+  sem_post(&semaphores[idx]);
 }
