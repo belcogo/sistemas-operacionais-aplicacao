@@ -7,7 +7,7 @@
 ## Compilando o código
 1. Clonar o repositório (branch `trabalho-GA`)
 1. No terminal acessar o diretório `factory/`
-1. Executar o comando `gcc factory.c Queue.c -o fac -lpthread -lrt`
+1. Executar o comando `gcc factory.c Queue.c -o factory -lpthread -lrt`
 1. Executar o comando `./factory`
 
 ____
