@@ -166,7 +166,7 @@ void *producer(int i) {
 			new_product.type = type;
 			new_product.price_range = prices[price_idx];
 			new_product.quality = qualities[quality_idx];
-			new_product.produce_time = generate_random_number(NULL);
+			new_product.produce_time = generate_random_number(3);
 			new_product.consume_time = new_product.produce_time * 0.8;
 
       production_time+= new_product.produce_time;
@@ -340,7 +340,7 @@ void show_statistics() {
   printf("%-20d%-30.2f\n", products_count, media_production_time);
   printf("%s%s\n", DETAIL_SEPARATOR, DETAIL_SEPARATOR);
   printf("%-20s%-20s%-20s\n", "TIPO A(%)", "TIPO B(%)", "TIPO C(%)");
-  printf("%-20d%-20.2f%-20.2f\n", calc_media(sum_a), calc_media(sum_b), calc_media(sum_c));
+  printf("%-20.2f%-20.2f%-20.2f\n", calc_media(sum_a), calc_media(sum_b), calc_media(sum_c));
   printf("%s%s\n", DETAIL_SEPARATOR, DETAIL_SEPARATOR);
   printf("%-20s%-20s%-20s\n", "QUALI. ALTA(%)", "QUALI. MEDIA(%)", "QUALI. BAIXA(%)");
   printf("%-20d%-20.2f%-20.2f\n", calc_media(sum_high), calc_media(sum_medium), calc_media(sum_low));
